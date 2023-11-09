@@ -19,7 +19,7 @@ const TempretureCheck = () => {
     const currentDate = new Date();
     const enteredDate = new Date(date.value);
 
-    console.log(currentDate.getTime(), enteredDate.getTime());
+    console.log(!cities.find(({ name }) => name === region));
 
     if (currentDate.getTime() > enteredDate.getTime()) {
       return errorSetter(-2);
