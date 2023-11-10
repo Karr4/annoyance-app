@@ -1,34 +1,92 @@
+// firebase
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, addDoc } from 'firebase/firestore';
+
 import { useState } from 'react';
 import { nanoid } from 'nanoid';
 import axios from 'axios';
 import css from './TempretureCheck.module.css';
-import cities from 'cities.json';
 
 axios.defaults.baseURL = 'http://api.weatherapi.com/v1';
 
+const cities = [{ name: 'London' }];
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyBgBmkRwC4bHkM55dCAWsBB3_z7eLY3iGQ',
+  authDomain: 'annoyanceproject-d1ce5.firebaseapp.com',
+  projectId: 'annoyanceproject-d1ce5',
+  storageBucket: 'annoyanceproject-d1ce5.appspot.com',
+  messagingSenderId: '181540434471',
+  appId: '1:181540434471:web:b8d612ed7f502582811402',
+};
+
+initializeApp(firebaseConfig);
+
+const db = getFirestore();
+
+const weatherRef = collection(db, 'weather');
+
 const TempretureCheck = () => {
   const [error, setError] = useState('');
+  const [result, setResult] = useState({});
 
-  const handleSubmit = e => {
+  // Метод для перевірки та додавання даних до бази даних
+
+  const handleSubmit = async e => {
     e.preventDefault();
 
     const { region, date } = e.target;
 
-    console.log(region.value, date.value);
-
     const currentDate = new Date();
     const enteredDate = new Date(date.value);
 
-    console.log(!cities.find(({ name }) => name === region));
+    const city = cities.find(({ name }) => name === region.value);
+
+    // Відповідно до помилки у введені даних, виводимо потрібне нам повідомлення
 
     if (currentDate.getTime() > enteredDate.getTime()) {
       return errorSetter(-2);
-    } else if (!cities.find(({ name }) => name === region)) {
+    } else if (!city) {
       return errorSetter(-1);
     } else {
       errorSetter(1);
     }
+
+    const { data } = await axios.get(
+      `http://api.weatherapi.com/v1/current.json`,
+      {
+        params: {
+          key: 'a7c989d3c3494837b63123814230911',
+          q: region.value,
+          dt: date.value,
+          aqi: 'no',
+        },
+      }
+    );
+
+    const { temp_c, feelslike_c, humidity, wind_kph } = data.current;
+
+    // Збереження даних у стейті для їх вивдення для користувача
+
+    setResult({
+      actual_tempreture: temp_c,
+      feeling_tempreture: feelslike_c,
+      humidity,
+      wind_speed: wind_kph,
+    });
+
+    // Метод для додавання документа в базу даних
+
+    addDoc(weatherRef, {
+      check_time: new Date(),
+      actual_tempreture: temp_c,
+      feeling_tempreture: feelslike_c,
+      humidity: humidity,
+      wind_speed: wind_kph,
+    });
   };
+
+  // Метод для виведення відповідних помилок для користувача
 
   const errorSetter = number => {
     if (number === 1) {
@@ -42,33 +100,53 @@ const TempretureCheck = () => {
 
   return (
     <>
-      <form className={css.form} onSubmit={handleSubmit}>
-        <label className={css.label}>
-          Region
-          <input
-            className={css.input}
-            type="text"
-            name="region"
-            placeholder="Enter the region 'Paris' or 'London'"
-          />
-        </label>
+      {Object.values(result).length === 0 ? (
+        <form className={css.box} onSubmit={handleSubmit}>
+          <label className={css.label}>
+            Region
+            <input
+              className={css.input}
+              type="text"
+              name="region"
+              placeholder="Enter the region 'Paris' or 'London'"
+            />
+          </label>
 
-        <label className={css.label}>
-          Date
-          <input
-            className={css.input}
-            type="text"
-            name="date"
-            placeholder="Enter the date mm/dd/yyyy"
-          />
-        </label>
+          <label className={css.label}>
+            Date
+            <input
+              className={css.input}
+              type="text"
+              name="date"
+              placeholder="Enter the date yyyy-mm-dd"
+            />
+          </label>
 
-        <button className={css.submit__button} type="submit">
-          Check the tempreture
-        </button>
+          <button className={css.submit__button} type="submit">
+            Check the tempreture
+          </button>
 
-        {error && <p className={css.error}>{error}</p>}
-      </form>
+          {error && <p className={css.error}>{error}</p>}
+        </form>
+      ) : (
+        <div className={css.box}>
+          <p className={css.label}>
+            Actual tempreture: {result.actual_tempreture}°C
+          </p>
+
+          <p className={css.label}>
+            Feeling tempreture: {result.feeling_tempreture}°C
+          </p>
+
+          <p className={css.label}>Humidity: {result.humidity}%</p>
+
+          <p className={css.label}>Wind wind_speed: {result.wind_speed}km/h</p>
+
+          <button className={css.submit__button} type="button">
+            Return to the main menu
+          </button>
+        </div>
+      )}
     </>
   );
 };
